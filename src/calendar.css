@@ -1,0 +1,78 @@
+/* Calendar custom styles */
+.rbc-calendar {
+    font-family: inherit;
+}
+
+.rbc-event {
+    padding: 2px 5px;
+    border-radius: 4px !important;
+    border: none !important;
+}
+
+.rbc-event.rbc-selected {
+    background-color: inherit !important;
+}
+
+.rbc-event:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
+}
+
+.rbc-today {
+    background-color: #f0f9ff !important;
+}
+
+.rbc-toolbar button {
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background-color: white;
+    font-weight: 500;
+}
+
+.rbc-toolbar button:hover {
+    background-color: #f1f5f9;
+}
+
+.rbc-toolbar button.rbc-active {
+    background-color: #64748b;
+    color: white;
+    border-color: #64748b;
+}
+
+.rbc-toolbar button.rbc-active:hover {
+    background-color: #475569;
+}
+
+.rbc-month-view,
+.rbc-time-view {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.rbc-header {
+    padding: 12px 4px;
+    font-weight: 600;
+    color: #334155;
+    background-color: #f8fafc;
+    border-bottom: 2px solid #e2e8f0 !important;
+}
+
+.rbc-off-range-bg {
+    background-color: #f8fafc;
+}
+
+.rbc-date-cell {
+    padding: 4px;
+}
+
+.rbc-event-label {
+    display: none;
+}
+
+.rbc-event-content {
+    white-space: normal !important;
+    overflow: visible !important;
+}

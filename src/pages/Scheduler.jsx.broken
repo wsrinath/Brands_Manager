@@ -1,0 +1,472 @@
+import React, { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, addDoc, doc, getDoc, serverTimestamp, Timestamp, query, onSnapshot, where } from 'firebase/firestore';
+import { Calendar, Plus, AlertCircle, CheckSquare, Copy, Trash2, Users, X } from 'lucide-react';
+import clsx from 'clsx';
+import ReactCalendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
+
+export default function Scheduler() {
+    const [brands, setBrands] = useState([]);
+    const [programs, setPrograms] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [success, setSuccess] = useState('');
+    const [error, setError] = useState('');
+    const [bulkMode, setBulkMode] = useState(false);
+    const [selectedDates, setSelectedDates] = useState([]);
+    const [showCalendar, setShowCalendar] = useState(false);
+    const [tempSelectedDates, setTempSelectedDates] = useState([]);
+    const [dateConfigurations, setDateConfigurations] = useState({}); // { "2025-11-25": { platforms: ['facebook'], adCount: 1 } }
+
+    const [formData, setFormData] = useState({
+        brand: '',
+        program: '',
+        description: '',
+        dueDate: '',
+        endDate: '',
+        adCount: 1,
+        taskCount: 1,
+        assignTo: '',
+        platforms: {
+            facebook: false,
+            youtube: false,
+            tiktok: false
+        },
+        recurring: false,
+        frequency: 'daily'
+    });
+
+    useEffect(() => {
+        const fetchMetadata = async () => {
+            try {
+                const docRef = doc(db, 'metadata', 'lists');
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setBrands(data.brands || []);
+                    setPrograms(data.programs || []);
+                }
+            } catch (err) {
+                console.error("Error fetching metadata:", err);
+                setError("Failed to load form data. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchMetadata();
+    }, []);
+
+    useEffect(() => {
+        const q = query(collection(db, 'users'), where('role', '==', 'editor'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const usersData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setUsers(usersData);
+        });
+
+        return unsubscribe;
+    }, []);
+
+    const handlePlatformChange = (platform) => {
+        setFormData(prev => ({
+            ...prev,
+            platforms: {
+                ...prev.platforms,
+                [platform]: !prev.platforms[platform]
+            }
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+        setError('');
+        setSuccess('');
+
+        try {
+            let tasksCreated = 0;
+            const selectedPlatforms = Object.keys(formData.platforms).filter(p => formData.platforms[p]);
+
+            if (selectedPlatforms.length === 0) {
+                throw new Error("Please select at least one platform");
+            }
+
+            if (!bulkMode) {
+                // Single Task Creation
+                const taskData = {
+                    created_at: serverTimestamp(),
+                    status: formData.assignTo ? 'Assigned' : 'Pending',
+                    brand: formData.brand,
+                    program: formData.program,
+                    description: formData.description,
+                    platform: selectedPlatforms,
+                    due_date: Timestamp.fromDate(new Date(formData.dueDate)),
+                    ad_count: parseInt(formData.adCount),
+                    task_count: parseInt(formData.taskCount)
+                };
+
+                if (formData.assignTo) {
+                    taskData.editor_id = formData.assignTo;
+                }
+
+                // Create copies if taskCount > 1
+                for (let i = 0; i < parseInt(formData.taskCount); i++) {
+                    await addDoc(collection(db, 'tasks'), taskData);
+                    tasksCreated++;
+                }
+            } else {
+                // Bulk Creation Logic
+                let allDates = [];
+
+                // 1. Add dates from Range if provided
+                if (formData.dueDate && formData.endDate) {
+                    let currentDate = new Date(formData.dueDate);
+                    const end = new Date(formData.endDate);
+
+                    while (currentDate <= end) {
+                        allDates.push(new Date(currentDate));
+
+                        // Increment based on frequency
+                        if (formData.frequency === 'daily') {
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        } else if (formData.frequency === 'weekly') {
+                            currentDate.setDate(currentDate.getDate() + 7);
+                        } else if (formData.frequency === 'monthly') {
+                            currentDate.setMonth(currentDate.getMonth() + 1);
+                        }
+                    }
+                }
+
+                // 2. Add manually selected dates
+                if (selectedDates.length > 0) {
+                    allDates = [...allDates, ...selectedDates];
+                }
+
+                // 3. Deduplicate dates
+                const uniqueDates = Array.from(new Set(allDates.map(d => d.toDateString())))
+                    .map(d => new Date(d));
+
+                if (uniqueDates.length === 0) {
+                    throw new Error("Please select a date range OR specific dates.");
+                }
+
+                // Create tasks for each unique date
+                for (const date of uniqueDates) {
+                    const taskData = {
+                        created_at: serverTimestamp(),
+                        status: formData.assignTo ? 'Assigned' : 'Pending',
+                        brand: formData.brand,
+                        program: formData.program,
+                        description: formData.description,
+                        platform: selectedPlatforms,
+                        due_date: Timestamp.fromDate(date),
+                        ad_count: parseInt(formData.adCount)
+                    };
+
+                    if (formData.assignTo) {
+                        taskData.editor_id = formData.assignTo;
+                    }
+
+                    // Create copies per date
+                    for (let i = 0; i < parseInt(formData.taskCount); i++) {
+                        await addDoc(collection(db, 'tasks'), taskData);
+                        tasksCreated++;
+                    }
+                }
+            }
+
+            setSuccess(`${tasksCreated} task(s) created successfully!`);
+            setFormData({
+                brand: '',
+                program: '',
+                description: '',
+                dueDate: '',
+                endDate: '',
+                adCount: 1,
+                taskCount: 1,
+                assignTo: '',
+                platforms: { facebook: false, youtube: false, tiktok: false },
+                recurring: false,
+                frequency: 'daily'
+            });
+            setSelectedDates([]);
+        } catch (err) {
+            setError("Failed to create task: " + err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const duplicateLastTask = () => {
+        setFormData(prev => ({
+            ...prev,
+            dueDate: '',
+            endDate: ''
+        }));
+        setSuccess('Form duplicated! Set new dates and submit.');
+    };
+
+    if (loading) return <div className="p-8 text-center text-slate-500">Loading form data...</div>;
+
+    return (
+        <div className="max-w-4xl mx-auto animate-fadeIn pb-8">
+            <div className="mb-8 flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-gradient">Schedule Tasks</h1>
+                    <p className="text-slate-600 font-medium mt-1">Create single or multiple brand sheets for production</p>
+                </div>
+
+                <div className="flex gap-3">
+                    <button
+                        onClick={duplicateLastTask}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white/80 backdrop-blur-sm text-slate-700 font-bold rounded-xl hover:bg-white hover:shadow-md transition-all border border-slate-200"
+                    >
+                        <Copy size={18} />
+                        Duplicate
+                    </button>
+                    <button
+                        onClick={() => setBulkMode(!bulkMode)}
+                        className={clsx(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm hover:shadow-md",
+                            bulkMode
+                                ? "gradient-primary text-white border-transparent"
+                                : "bg-white/80 backdrop-blur-sm text-slate-700 border border-slate-200 hover:bg-white"
+                        )}
+                    >
+                        <Calendar size={18} />
+                        {bulkMode ? 'Single Task' : 'Bulk Schedule'}
+                    </button>
+                </div>
+            </div>
+
+            <div className="card-glass rounded-2xl shadow-premium p-8 animate-slideUp">
+                {error && (
+                    <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-700 rounded-xl flex items-center gap-3 shadow-sm">
+                        <AlertCircle size={20} />
+                        <span className="font-medium">{error}</span>
+                    </div>
+                )}
+
+                {success && (
+                    <div className="mb-6 p-4 bg-green-50/80 backdrop-blur-sm border border-green-100 text-green-700 rounded-xl flex items-center gap-3 shadow-sm">
+                        <CheckSquare size={20} />
+                        <span className="font-medium">{success}</span>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Brand *</label>
+                            <select
+                                required
+                                className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium"
+                                value={formData.brand}
+                                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                            >
+                                <option value="">Select Brand</option>
+                                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Program *</label>
+                            <select
+                                required
+                                className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium"
+                                value={formData.program}
+                                onChange={(e) => setFormData({ ...formData, program: e.target.value })}
+                            >
+                                <option value="">Select Program</option>
+                                {programs.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Description *</label>
+                        <textarea
+                            required
+                            rows={3}
+                            className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium resize-none"
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            placeholder="Task details..."
+                        />
+                    </div>
+
+                    {bulkMode ? (
+                        <div className="bg-indigo-50/50 backdrop-blur-sm p-6 rounded-2xl border border-indigo-100 shadow-inner">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-wide">Bulk Scheduling Options</h3>
+                            </div>
+
+                            <div className="space-y-8">
+                                {/* Date Range Section */}
+                                <div className="bg-white/50 rounded-xl p-4 border border-indigo-100">
+                                    <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                        <Calendar size={16} className="text-indigo-600" />
+                                        Date Range (Optional)
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Start Date</label>
+                                            <input
+                                                type="date"
+                                                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium"
+                                                value={formData.dueDate}
+                                                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">End Date</label>
+                                            <input
+                                                type="date"
+                                                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium"
+                                                value={formData.endDate}
+                                                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Frequency</label>
+                                            <select
+                                                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium"
+                                                value={formData.frequency}
+                                                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                                            >
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Manual Selection Section */}
+                                <div className="bg-white/50 rounded-xl p-4 border border-indigo-100">
+                                    <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                        <Calendar size={16} className="text-indigo-600" />
+                                        Specific Dates (Optional)
+                                    </h4>
+
+                                    <div className="space-y-4">
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {selectedDates.length > 0 ? (
+                                                selectedDates.map((date, index) => (
+                                                    <div key={index} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg font-medium text-sm">
+                                                        {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSelectedDates(selectedDates.filter((_, i) => i !== index))}
+                                                            className="ml-1 text-indigo-600 hover:text-indigo-800"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <span className="text-sm text-slate-500 italic">No specific dates selected</span>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowCalendar(true);
+                                                setTempSelectedDates(selectedDates);
+                                            }}
+                                            className="w-full px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={16} />
+                                            Select Dates from Calendar
+                                        </button>
+
+                                        {/* Calendar Popup Modal */}
+                                        {showCalendar && (
+                                            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                                                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-slideUp">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <h3 className="text-lg font-bold">Select Dates</h3>
+                                                        <button type="button" onClick={() => setShowCalendar(false)} className="p-2 hover:bg-gray-100 rounded">
+                                                            <X size={20} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="mb-4">
+                                                        <ReactCalendar
+                                                            value={null}
+                                                            onClickDay={(value) => {
+                                                                const date = new Date(value);
+                                                                const dateStr = date.toDateString();
+                                                                const exists = tempSelectedDates.some(d => d.toDateString() === dateStr);
+
+                                                                if (exists) {
+                                                                    setTempSelectedDates(tempSelectedDates.filter(d => d.toDateString() !== dateStr));
+                                                                } else {
+                                                                    setTempSelectedDates([...tempSelectedDates, date].sort((a, b) => a - b));
+                                                                }
+                                                            }}
+                                                            tileClassName={({ date }) => {
+                                                                const isSelected = tempSelectedDates.some(d => d.toDateString() === date.toDateString());
+                                                                return isSelected ? "bg-indigo-600 text-white rounded-full font-bold" : "";
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {tempSelectedDates.length > 0 && (
+                                                        <div className="mb-4 p-3 bg-slate-50 rounded-lg max-h-32 overflow-y-auto">
+                                                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                                                                Selected ({tempSelectedDates.length})
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {tempSelectedDates.map((date, idx) => (
+                                                                    <span key={idx} className="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-700 font-medium">
+                                                                        {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            {['Facebook', 'YouTube', 'TikTok'].map(platform => (
+                                                                <label key={platform} className="flex items-center gap-2 cursor-pointer group">
+                                                                    <div className="relative flex items-center">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="peer sr-only"
+                                                                            checked={formData.platforms[platform.toLowerCase()]}
+                                                                            onChange={() => handlePlatformChange(platform.toLowerCase())}
+                                                                        />
+                                                                        <div className="w-5 h-5 border-2 border-slate-300 rounded-md peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all flex items-center justify-center">
+                                                                            <div className="w-2.5 h-1.5 border-b-2 border-l-2 border-white -rotate-45 mt-[-2px] opacity-0 peer-checked:opacity-100"></div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="text-slate-700 font-medium group-hover:text-indigo-600 transition-colors">{platform}</span>
+                                                                </label>
+                                                            ))}
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="submit"
+                                                    disabled={submitting}
+                                                    className="w-full gradient-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-glow hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <Plus size={22} />
+                                                    Create
+                                                </button>
+                                            </form>
+            </div>
+                                </div>
+                                );
+}

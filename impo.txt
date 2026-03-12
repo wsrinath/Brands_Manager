@@ -1,0 +1,2 @@
+running steps 
+flutter devices; npm run dev

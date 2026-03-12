@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 🛡️ Robust Role Helper (handles missing docs and any casing)
+    function hasRole(roleName) {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return request.auth != null && 
+             exists(userPath) && 
+             get(userPath).data.get('role', '').lower() == roleName.lower();
+    }
+
+    function isAuthorized() {
+      return hasRole('admin') || hasRole('scheduler');
+    }
+
+    // 🚨 GLOBAL DEBUG RULE: Allow all authenticated users to read/write everything
+    // This allows us to rule out specific path issues.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
