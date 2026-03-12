@@ -1,22 +1,24 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthGuard from './components/AuthGuard';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import SignUp from './pages/SignUp';
-import Dashboard from './pages/Dashboard';
-import Scheduler from './pages/Scheduler';
-import Editor from './pages/Editor';
-import Admin from './pages/Admin';
-import Profile from './pages/Profile';
-import Kanban from './pages/Kanban';
-import CalendarView from './pages/CalendarView';
-import MarketingDashboard from './pages/MarketingDashboard';
-import TaskHistory from './pages/TaskHistory';
-import AuditorView from './pages/AuditorView';
-import Review from './pages/Review';
-import Compare from './pages/Compare';
+
+// Lazy-load all pages so they only download when navigated to
+const Login = React.lazy(() => import('./pages/Login'));
+const SignUp = React.lazy(() => import('./pages/SignUp'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Scheduler = React.lazy(() => import('./pages/Scheduler'));
+const Editor = React.lazy(() => import('./pages/Editor'));
+const Admin = React.lazy(() => import('./pages/Admin'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Kanban = React.lazy(() => import('./pages/Kanban'));
+const CalendarView = React.lazy(() => import('./pages/CalendarView'));
+const MarketingDashboard = React.lazy(() => import('./pages/MarketingDashboard'));
+const TaskHistory = React.lazy(() => import('./pages/TaskHistory'));
+const AuditorView = React.lazy(() => import('./pages/AuditorView'));
+const Review = React.lazy(() => import('./pages/Review'));
+const Compare = React.lazy(() => import('./pages/Compare'));
 
 function RoleRedirect() {
   const { userRole } = useAuth();
@@ -33,8 +35,13 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+        <Suspense fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+          </div>
+        }>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
 
           <Route element={
@@ -119,6 +126,7 @@ function App() {
             </AuthGuard>
           } />
         </Routes>
+        </Suspense>
       </AuthProvider>
     </Router>
   );
