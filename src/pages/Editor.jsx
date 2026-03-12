@@ -536,20 +536,18 @@ export default function Editor() {
             const fetchViews = async (url) => {
                 if (!url) return 0;
                 try {
-                    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-                    if (isYouTube) {
-                        const longUrl = getYouTubeLongUrl(url);
-                        const apiUrl = `https://us-central1-sheetbot-475711.cloudfunctions.net/get_youtube_views?url=${encodeURIComponent(longUrl)}`;
-                        const response = await fetch(apiUrl);
-                        const data = await response.json();
-                        return data.views || data.view_count || 0;
-                    } else {
-                        const apiUrl = `https://video-api-801394283865.us-central1.run.app/views?url=${encodeURIComponent(url)}`;
-                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-                        const response = await fetch(proxyUrl);
-                        const data = await response.json();
-                        return data.view_count || 0;
+                    // TODO: Replace this URL with your unique Google Cloud Run URL after deployment!
+                    const SCRAPER_API_BASE_URL = 'https://view-scraper-api-406158641394.asia-south1.run.app';
+                    const apiUrl = `${SCRAPER_API_BASE_URL}/views?url=${encodeURIComponent(url)}`;
+
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) {
+                        console.warn(`Scraper API returned error for ${url}: ${response.status}`);
+                        return 0;
                     }
+
+                    const data = await response.json();
+                    return parseInt(data.view_count || 0);
                 } catch (err) {
                     console.error("Error fetching views:", err);
                     return 0;
@@ -700,14 +698,21 @@ export default function Editor() {
                         const longUrl = getYouTubeLongUrl(url);
                         const apiUrl = `https://us-central1-sheetbot-475711.cloudfunctions.net/get_youtube_views?url=${encodeURIComponent(longUrl)}`;
                         const response = await fetch(apiUrl);
-                        const data = await response.json();
-                        return data.views || data.view_count || 0;
+                        const text = await response.text();
+                        let viewCount = 0;
+                        try {
+                            const data = JSON.parse(text);
+                            viewCount = parseInt(data.view_count || data.views || 0);
+                        } catch (e) {
+                            viewCount = parseInt(text) || 0;
+                        }
+                        return viewCount;
                     } else {
                         const apiUrl = `https://video-api-801394283865.us-central1.run.app/views?url=${encodeURIComponent(url)}`;
                         const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
                         const response = await fetch(proxyUrl);
                         const data = await response.json();
-                        return data.view_count || 0;
+                        return parseInt(data.view_count || 0);
                     }
                 } catch (err) {
                     console.error("Error fetching views:", err);
@@ -792,41 +797,21 @@ export default function Editor() {
             let processedCount = 0;
             let errorFound = false;
 
-            // Helper to fetch views (reused)
             const fetchViews = async (url) => {
                 if (!url) return 0;
                 try {
-                    // Check if it's a YouTube URL
-                    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+                    // TODO: Replace this URL with your unique Google Cloud Run URL after deployment!
+                    const SCRAPER_API_BASE_URL = 'https://view-scraper-api-406158641394.asia-south1.run.app';
+                    const apiUrl = `${SCRAPER_API_BASE_URL}/views?url=${encodeURIComponent(url)}`;
 
-                    if (isYouTube) {
-                        const longUrl = getYouTubeLongUrl(url);
-
-                        const apiUrl = `https://us-central1-sheetbot-475711.cloudfunctions.net/get_youtube_views?url=${encodeURIComponent(longUrl)}`;
-
-                        const response = await fetch(apiUrl);
-
-                        const text = await response.text();
-
-                        // Try to parse as JSON first
-                        let viewCount = 0;
-                        try {
-                            const data = JSON.parse(text);
-                            viewCount = parseInt(data.view_count || data.views || 0);
-                        } catch (e) {
-                            // If not JSON, try to parse as number
-                            viewCount = parseInt(text) || 0;
-                        }
-
-                        return viewCount;
-                    } else {
-                        // Use old API for TikTok/Facebook
-                        const apiUrl = `https://video-api-801394283865.us-central1.run.app/views?url=${encodeURIComponent(url)}`;
-                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-                        const response = await fetch(proxyUrl);
-                        const data = await response.json();
-                        return parseInt(data.view_count || 0);
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) {
+                        console.warn(`Scraper API returned error for ${url}: ${response.status}`);
+                        return 0;
                     }
+
+                    const data = await response.json();
+                    return parseInt(data.view_count || 0);
                 } catch (err) {
                     console.error("Error fetching views for:", url, err);
                     return 0;

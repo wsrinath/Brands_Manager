@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, getDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDoc, doc, deleteDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { History, Filter, X, Download, Trash2 } from 'lucide-react';
+import { History, Filter, X, Download, Trash2, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
@@ -10,6 +10,7 @@ export default function TaskHistory() {
     const [tasks, setTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isUpdating, setIsUpdating] = useState(false);
     const { currentUser, userRole } = useAuth();
     const [userNames, setUserNames] = useState({});
     const [allEditors, setAllEditors] = useState([]);
@@ -248,6 +249,64 @@ export default function TaskHistory() {
         XLSX.writeFile(workbook, filename);
     };
 
+    const handleUpdateViews = async () => {
+        if (filteredTasks.length === 0) {
+            alert("No tasks available to update matching current filters.");
+            return;
+        }
+
+        setIsUpdating(true);
+        try {
+            const SCRAPER_API_BASE_URL = 'https://view-scraper-api-406158641394.asia-south1.run.app';
+
+            const fetchViews = async (url) => {
+                if (!url) return 0;
+                try {
+                    const apiUrl = `${SCRAPER_API_BASE_URL}/views?url=${encodeURIComponent(url)}`;
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) return 0;
+                    const data = await response.json();
+                    return parseInt(data.view_count || 0);
+                } catch (err) {
+                    console.error("Error fetching views for:", url, err);
+                    return 0;
+                }
+            };
+
+            let updatedCount = 0;
+
+            for (const task of filteredTasks) {
+                let updated = false;
+                const newViewCounts = { ...task.view_counts };
+                
+                for (const p of ['youtube', 'facebook', 'tiktok']) {
+                    const links = task.editor_links?.[p];
+                    const linksArray = Array.isArray(links) ? links : (links ? [links] : []);
+                    if (linksArray.length === 0) continue;
+
+                    const viewCounts = await Promise.all(linksArray.map(u => fetchViews(u)));
+                    newViewCounts[p] = viewCounts;
+                    updated = true;
+                }
+
+                if (updated) {
+                    const taskRef = doc(db, 'tasks', task.id);
+                    await updateDoc(taskRef, {
+                        view_counts: newViewCounts
+                    });
+                    updatedCount++;
+                }
+            }
+
+            alert(`Successfully updated view counts for ${updatedCount} tasks.`);
+        } catch (error) {
+            console.error("Error updating views:", error);
+            alert("Failed to update views: " + error.message);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-slate-500">Loading task history...</div>;
 
     return (
@@ -258,13 +317,26 @@ export default function TaskHistory() {
                     <h1 className="text-4xl font-bold text-gradient mb-2">Task History</h1>
                     <p className="text-slate-500">{userRole === 'Editor' ? 'View your completed tasks' : 'View all scheduled tasks'}</p>
                 </div>
-                <button
-                    onClick={handleExportToExcel}
-                    className="flex items-center gap-2 px-5 py-2.5 gradient-primary text-white rounded-xl font-bold hover:shadow-glow transition-all transform hover:scale-105 active:scale-95"
-                >
-                    <Download size={18} />
-                    Export to Excel
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleUpdateViews}
+                        disabled={isUpdating}
+                        className={clsx(
+                            "flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-xl font-bold transition-all transform",
+                            isUpdating ? "opacity-70 cursor-not-allowed" : "hover:shadow-lg hover:scale-105 active:scale-95"
+                        )}
+                    >
+                        <RefreshCw size={18} className={clsx(isUpdating && "animate-spin")} />
+                        {isUpdating ? 'Updating...' : 'Update Views'}
+                    </button>
+                    <button
+                        onClick={handleExportToExcel}
+                        className="flex items-center gap-2 px-5 py-2.5 gradient-primary text-white rounded-xl font-bold hover:shadow-glow transition-all transform hover:scale-105 active:scale-95"
+                    >
+                        <Download size={18} />
+                        Export to Excel
+                    </button>
+                </div>
             </div>
 
             {/* Filters Section */}
