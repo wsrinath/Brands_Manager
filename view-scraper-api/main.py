@@ -5,13 +5,13 @@ import traceback
 
 app = FastAPI()
 
-# Configure CORS so Editor.jsx can fetch directly without proxy
+# Configure CORS so frontend can fetch directly
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for simplicity (or restrict to your production URL)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/views")
@@ -22,50 +22,126 @@ async def get_views(url: str):
     view_count = 0
     title = 'Unknown'
     
-    # Attempt 1: yt-dlp
+    # Attempt 1: yt-dlp (FIXED: removed extract_flat which skips view_count)
     try:
         ydl_opts = {
             'quiet': True,
-            'extract_flat': True,
             'no_warnings': True,
             'simulate': True,
+            # Do NOT use extract_flat=True — it skips view_count metadata on single videos
+            'skip_download': True,
+            # Use a realistic browser User-Agent to avoid bot detection
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            # Avoid certificate errors in Cloud Run environment
+            'nocheckcertificate': True,
+            # Increase timeout for slow platforms
+            'socket_timeout': 15,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print(f"[yt-dlp] Attempting to extract info for URL: {url}")
             info_dict = ydl.extract_info(url, download=False)
-            vc = info_dict.get('view_count')
-            if vc is None and 'entries' in info_dict and len(info_dict['entries']) > 0:
-                vc = info_dict['entries'][0].get('view_count', 0)
-            if vc is not None:
-                view_count = vc
-            title = info_dict.get('title', 'Unknown')
+            if info_dict:
+                print(f"[yt-dlp] Raw info_dict obtained: {info_dict.get('view_count')}, entries: {info_dict.get('entries') is not None}")
+                vc = info_dict.get('view_count')
+                print(f"[yt-dlp] Initial view_count (vc): {vc}")
+                # For playlists / entries fall back to first entry
+                if vc is None and 'entries' in info_dict:
+                    print(f"[yt-dlp] 'view_count' is None, checking entries...")
+                    entries = info_dict.get('entries') or []
+                    if entries:
+                        vc = entries[0].get('view_count', 0)
+                        print(f"[yt-dlp] View count from first entry: {vc}")
+                if vc is not None:
+                    view_count = int(vc)
+                    print(f"[yt-dlp] Final view_count after conversion: {view_count}")
+                title = info_dict.get('title', 'Unknown')
+                print(f"[yt-dlp] Success for {url}: view_count={view_count}, title={title}")
     except Exception as e:
-        print(f"yt-dlp failed for {url}: {e}")
+        print(f"[yt-dlp] Failed for {url}: {e}")
+        traceback.print_exc()
         
-    # Attempt 2: FALLBACK HTML Scraping
+    # Attempt 2: FALLBACK HTML Scraping (only for YouTube, since FB/TT are JS-rendered)
+    # Note: This fallback ONLY works reliably for YouTube. Facebook and TikTok pages
+    # are JavaScript-rendered and their view counts won't appear in raw HTML.
+    # For FB/TT, yt-dlp is the only practical option from a server-side Python script.
     if not view_count:
         import urllib.request
         import re
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
-            html = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
-            if 'youtube.com' in url or 'youtu.be' in url:
-                match = re.search(r'"viewCount":"(\d+)"', html)
-                if not match: match = re.search(r'itemprop="interactionCount" content="(\d+)"', html)
-                if match: view_count = int(match.group(1))
-            elif 'facebook.com' in url:
-                match = re.search(r'"play_count":(\d+)', html)
-                if not match: match = re.search(r'"video_view_count":(\d+)', html)
-                if match: view_count = int(match.group(1))
-            elif 'tiktok.com' in url:
-                match = re.search(r'"playCount":(\d+)', html)
-                if not match: match = re.search(r'"viewCount":(\d+)', html)
-                if match: view_count = int(match.group(1))
-        except Exception as ex:
-            print(f"Fallback scraper failed for {url}: {ex}")
+            print(f"[HTML Scraper] Attempting to fetch URL via urllib: {url}")
+            req = urllib.request.Request(
+                url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                }
+            )
+            html = urllib.request.urlopen(req, timeout=10).read().decode('utf-8')
+            print(f"[HTML Scraper] Fetched HTML content length: {len(html)} characters")
 
-    # We return 200 with count 0 if both fail, so the frontend gracefully saves '0' and doesn't abort
+            if 'youtube.com' in url or 'youtu.be' in url:
+                print(f"[HTML Scraper] Detected YouTube URL. Trying regex patterns...")
+                # YouTube embeds view count in its initial page data JSON
+                match = re.search(r'"viewCount"\s*:\s*"(\d+)"', html)
+                if not match:
+                    print(f"[HTML Scraper] YouTube regex 1 failed. Trying regex 2...")
+                    match = re.search(r'itemprop="interactionCount"\s+content="(\d+)"', html)
+                if not match:
+                    print(f"[HTML Scraper] YouTube regex 2 failed. Trying regex 3...")
+                    # Another common pattern in YouTube's ytInitialData
+                    match = re.search(r'"viewCount":"(\d+)"', html)
+                if match:
+                    view_count = int(match.group(1))
+                    print(f"[HTML Scraper] YouTube view count found: {view_count}")
+                else:
+                    print(f"[HTML Scraper] Could not find viewCount in YouTube HTML for {url}")
+
+            elif 'facebook.com' in url:
+                print(f"[HTML Scraper] Detected Facebook URL. Trying regex patterns...")
+                # Facebook is JS-rendered — regex rarely works here.
+                # Attempt anyway as a last resort.
+                match = re.search(r'"play_count"\s*:\s*(\d+)', html)
+                if not match:
+                    print(f"[HTML Scraper] Facebook regex 1 failed. Trying regex 2...")
+                    match = re.search(r'"video_view_count"\s*:\s*(\d+)', html)
+                if not match:
+                    print(f"[HTML Scraper] Facebook regex 2 failed. Trying regex 3...")
+                    match = re.search(r'"playCount"\s*:\s*(\d+)', html)
+                if match:
+                    view_count = int(match.group(1))
+                    print(f"[HTML Scraper] Facebook view count found: {view_count}")
+                else:
+                    print(f"[HTML Scraper] Facebook page is JS-rendered, could not find view count for {url}")
+
+            elif 'tiktok.com' in url:
+                print(f"[HTML Scraper] Detected TikTok URL. Trying regex patterns...")
+                # TikTok is JS-rendered — regex rarely works here.
+                match = re.search(r'"playCount"\s*:\s*(\d+)', html)
+                if not match:
+                    print(f"[HTML Scraper] TikTok regex 1 failed. Trying regex 2...")
+                    match = re.search(r'"viewCount"\s*:\s*(\d+)', html)
+                if not match:
+                    print(f"[HTML Scraper] TikTok regex 2 failed. Trying regex 3...")
+                    # TikTok sometimes puts it in SIGI_STATE JSON blob
+                    match = re.search(r'"play_count"\s*:\s*(\d+)', html)
+                if match:
+                    view_count = int(match.group(1))
+                    print(f"[HTML Scraper] TikTok view count found: {view_count}")
+                else:
+                    print(f"[HTML Scraper] TikTok page is JS-rendered, could not find view count for {url}")
+
+        except Exception as ex:
+            print(f"[HTML Scraper] Failed for {url}: {ex}")
+
+    print(f"[Final] view_count={view_count} for url={url}")
+
+    # Return 200 with count 0 if both methods fail — frontend saves 0 gracefully
     return {
-        "view_count": view_count, 
+        "view_count": view_count,
         "url": url,
         "title": title
     }
