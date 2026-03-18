@@ -1,3 +1,6 @@
+# cli_dev is deployed to the live site https://brands-manager.web.app/cli_dev
+
+
 # Brand Manager App 🚀
 
 A comprehensive Brand Management solution featuring a React-based web dashboard and a Flutter-based mobile application. This project provides a centralized platform for managing tasks, schedules, and marketing intelligence with role-based access.
