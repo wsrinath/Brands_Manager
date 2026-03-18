@@ -1,0 +1,2 @@
+in this "* dev_copy" branch i have added the residential proxy for the fb and tt and also fixed the yt-dlp view count extraction
+to fetch the view count for the fb and tt and  yt. view-scrapper-api (this includes more development) and view-scrapper-cli (this includes more development) and view-scrapper-cli2 has some previous developments

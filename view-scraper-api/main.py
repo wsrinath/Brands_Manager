@@ -3,8 +3,32 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import yt_dlp
 import traceback
+import os
+import requests
+from typing import Any
+from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qs
+
+load_dotenv()
+YOUTUBE_API_KEY = os.getenv("YT")
+RESIDENTIAL_PROXY = os.getenv("PROXY_URL")
 
 app = FastAPI()
+
+def extract_youtube_video_id(url):
+    parsed = urlparse(url)
+    if 'youtube.com' in parsed.netloc:
+        if '/shorts/' in parsed.path:
+            return parsed.path.split('/shorts/')[1].split('?')[0].split('#')[0].split('/')[0]
+        elif '/live/' in parsed.path:
+            return parsed.path.split('/live/')[1].split('?')[0].split('#')[0].split('/')[0]
+        elif parsed.path == '/watch':
+            return parse_qs(parsed.query).get('v', [None])[0]
+        elif '/v/' in parsed.path:
+            return parsed.path.split('/v/')[1].split('?')[0].split('#')[0].split('/')[0]
+    elif 'youtu.be' in parsed.netloc:
+        return parsed.path.lstrip('/').split('?')[0].split('#')[0].split('/')[0]
+    return None
 
 # Configure CORS so frontend can fetch directly
 app.add_middleware(
@@ -23,9 +47,39 @@ async def get_views(url: str):
     view_count = 0
     title = 'Unknown'
     
+    # Attempt 0: YouTube Data API v3 (Fastest and most reliable for YouTube)
+    if 'youtube.com' in url or 'youtu.be' in url:
+        video_id = extract_youtube_video_id(url)
+        if video_id and YOUTUBE_API_KEY:
+            try:
+                print(f"[YouTube API] Extracted video ID: {video_id}. Calling API...")
+                api_url = f"https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id={video_id}&key={YOUTUBE_API_KEY}"
+                response = requests.get(api_url, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("items"):
+                        item = data["items"][0]
+                        api_view_count = int(item["statistics"].get("viewCount", 0))
+                        api_title = item["snippet"].get("title", 'Unknown')
+                        print(f"[YouTube API] Success for {url}: view_count={api_view_count}, title={api_title}")
+                        return {
+                            "view_count": api_view_count,
+                            "url": url,
+                            "title": api_title
+                        }
+                    else:
+                        print(f"[YouTube API] No items found for video ID: {video_id}")
+                else:
+                    print(f"[YouTube API] Failed with status code: {response.status_code}, detail: {response.text}")
+            except Exception as e:
+                print(f"[YouTube API] Exception for {url}: {e}")
+                traceback.print_exc()
+        else:
+            print(f"[YouTube API] Could not extract video ID or YT API Key missing.")
+
     # Attempt 1: yt-dlp (FIXED: removed extract_flat which skips view_count)
     try:
-        ydl_opts = {
+        ydl_opts: dict[str, Any] = {
             'quiet': True,
             'no_warnings': True,
             'simulate': True,
@@ -50,6 +104,12 @@ async def get_views(url: str):
             'retries': 2,
             'fragment_retries': 2,
         }
+        
+        # Apply residential proxy for TT and FB specifically
+        if RESIDENTIAL_PROXY and ('tiktok.com' in url or 'facebook.com' in url or 'fb.watch' in url):
+            ydl_opts['proxy'] = RESIDENTIAL_PROXY
+            print(f"[yt-dlp] Using proxy for {url}")
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print(f"[yt-dlp] Attempting to extract info for URL: {url}")
             info_dict = ydl.extract_info(url, download=False)
