@@ -53,7 +53,7 @@ npx firebase deploy --only hosting:ttytfb_view
 ```
 
 ### Command	Purpose
-npm run dev	develop the app
+npm run dev 	: develop the app
 npm run build	: create production build
 npm run preview	: test production build locally
 firebase deploy --only hosting	: publish the site
