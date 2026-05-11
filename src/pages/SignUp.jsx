@@ -76,8 +76,8 @@ export default function SignUp() {
                     {/* Logo/Icon */}
                     <div className="text-center mb-8">
                         <div className="relative inline-block">
-                            <div className="w-16 h-16 gradient-success rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-glow animate-glow">
-                                <UserPlus size={32} className="animate-pulse-slow" />
+                            <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-glow animate-glow overflow-hidden">
+                                <img src="/hirulogo.png" alt="Hiru Logo" className="w-full h-full object-contain p-2" />
                             </div>
                             <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center animate-pulse">
                                 <Sparkles size={14} className="text-white" />
@@ -86,7 +86,7 @@ export default function SignUp() {
                         <h2 className="text-3xl font-bold text-slate-900 mb-2">
                             Create Account
                         </h2>
-                        <p className="text-slate-700 font-medium">Join the MediaFlow team</p>
+                        <p className="text-slate-700 font-medium">Join the Hiru Media Flow team</p>
                     </div>
 
                     {error && (

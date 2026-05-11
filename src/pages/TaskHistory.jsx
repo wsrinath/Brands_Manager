@@ -211,6 +211,7 @@ export default function TaskHistory() {
                         'Due Date': task.due_date?.toDate().toLocaleDateString() || 'N/A',
                         'Client': task.client || 'N/A',
                         'Programme': task.program || 'N/A',
+                        'Description': task.description || 'N/A',
                         'Editor': userNames[task.editor_id] || 'Unassigned',
                         'Brand': task.brand || 'N/A',
                         'Status': task.status || 'N/A',
@@ -228,6 +229,7 @@ export default function TaskHistory() {
                     'Due Date': task.due_date?.toDate().toLocaleDateString() || 'N/A',
                     'Client': task.client || 'N/A',
                     'Programme': task.program || 'N/A',
+                    'Description': task.description || 'N/A',
                     'Editor': userNames[task.editor_id] || 'Unassigned',
                     'Brand': task.brand || 'N/A',
                     'Status': task.status || 'N/A',
@@ -416,6 +418,7 @@ export default function TaskHistory() {
                                 <th className="px-6 py-4">Due Date</th>
                                 <th className="px-6 py-4">Client</th>
                                 <th className="px-6 py-4">Programme</th>
+                                <th className="px-6 py-4">Description</th>
                                 <th className="px-6 py-4 text-indigo-600">Editor</th>
                                 <th className="px-6 py-4">Brand</th>
                                 <th className="px-6 py-4">Status</th>
@@ -436,6 +439,9 @@ export default function TaskHistory() {
                                     </td>
                                     <td className="px-6 py-4 font-medium text-slate-900">{task.client || '-'}</td>
                                     <td className="px-6 py-4 font-medium text-slate-900">{task.program}</td>
+                                    <td className="px-6 py-4 text-slate-600 max-w-md truncate" title={task.description}>
+                                        {task.description || '-'}
+                                    </td>
                                     <td className="px-6 py-4 font-bold text-indigo-600">
                                         {userNames[task.editor_id] || <span className="text-slate-300 italic text-xs">Unassigned</span>}
                                     </td>
@@ -525,7 +531,7 @@ export default function TaskHistory() {
                             ))}
                             {filteredTasks.length === 0 && (
                                 <tr>
-                                    <td colSpan={userRole === 'Scheduler' ? 9 : 8} className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan={(userRole === 'Scheduler' || userRole === 'Admin') ? 12 : 11} className="px-6 py-12 text-center text-slate-400">
                                         No tasks found
                                     </td>
                                 </tr>
