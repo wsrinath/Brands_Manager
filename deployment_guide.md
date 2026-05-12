@@ -57,10 +57,13 @@ npx firebase deploy --only hosting:ttytfb_view
 
 2)npm run build	: create production build = Package app for production
 
-3)npm run preview	: test production build locally = Simulate live production locally
+3)Do QA properly in this step:- npm run preview	: test production build locally = Simulate live production locally
 
 4)(No need every time)firebase hosting:channel:deploy preview-name (This gives you a temporary URL (like your npm run preview) but on Firebase's actual infrastructure. Share this with your QA team first.)
 
 5)npx firebase deploy --only hosting : publish the site
 (same result as:- firebase deploy --only hosting) = firebase deploy	Publish to internet
 
+6)After each feature change or deployment, update the github. 
+
+7)Arrange a zip file with latest repo and save locally and save cloud(google drive or one drive).

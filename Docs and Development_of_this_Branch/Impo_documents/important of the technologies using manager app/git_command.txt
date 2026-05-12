@@ -1,0 +1,59 @@
+git branch
+
+git status
+On branch dev
+
+git checkout dev
+branch 'dev' set up to track 'origin/dev'.
+Switched to a new branch 'dev'
+
+PS C:\Users\HP\Documents\GitHub\Latest_Brand_Manager_APP> git pull origin dev
+From https://github.com/wslotusai/Latest_Brand_Manager_APP
+ * branch            dev        -> FETCH_HEAD
+Already up to date.
+
+PS C:\Users\HP\Documents\GitHub\Latest_Brand_Manager_APP> git checkout -b feature/task_history_to_auditor
+Switched to a new branch 'feature/task_history_to_auditor'
+
+
+Save Your Work (Commit)
+git add .
+git commit -m "Add basic audit log structure to Firestore"
+
+_________________________________________________________________________
+prints information about your Firestore database:
+gcloud firestore databases describe --database='(default)'
+gcloud firestore databases update --database='(default)' (-protection)
+Safe Web-Only Deployment:
+npm run build; npx firebase deploy --only hosting
+(DO not do this : npm run build; npx firebase deploy)
+
+_________________________________________________________________________
+Step 0:
+firebase use
+Step 1: Link your Staging Project
+firebase use --add brands-manager-staging
+Step 2: Link your Production Project
+firebase use --add brands-manager
+
+1. Run in Staging Mode (Recommended)
+You have a built-in script in package.json specifically for staging.
+npm run dev:staging
+
+2. Run in Production Mode
+This is the default mode.
+npm run dev
+
+Step	Scope	What it controls
+firebase use --add	Firebase CLI	Which Firebase project commands deploy to
+npm run dev:staging	App runtime	Which env variables & APIs your app uses
+
+_________________________________________________________________________
+
+this is the credentials of new staging application 
+admin@mediaflow.lk
+Admin@2026
+
+sheduletes1@gmail.com
+
+
