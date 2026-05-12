@@ -42,3 +42,25 @@ npx firebase deploy
 ## Troubleshooting
 -   **"Command not found"**: If `firebase` is not recognized, try `npm install -g firebase-tools` then `firebase login`.
 -   **Wrong Project**: If it tries to deploy to the wrong project, run `firebase use default` or `firebase use brands-manager` before deploying.
+
+# To deploy the TTYTFB_VIEW application
+
+*** npx firebase deploy --only hosting
+
+```bash
+npm run build
+npx firebase deploy --only hosting:ttytfb_view
+```
+
+### Command	Purpose
+1)npm run dev 	: develop the app = Build feature, check the feature is working correctly
+
+2)npm run build	: create production build = Package app for production
+
+3)npm run preview	: test production build locally = Simulate live production locally
+
+4)(No need every time)firebase hosting:channel:deploy preview-name (This gives you a temporary URL (like your npm run preview) but on Firebase's actual infrastructure. Share this with your QA team first.)
+
+5)npx firebase deploy --only hosting : publish the site
+(same result as:- firebase deploy --only hosting) = firebase deploy	Publish to internet
+

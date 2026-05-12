@@ -47,8 +47,8 @@ export default function Login() {
                     {/* Logo/Icon */}
                     <div className="text-center mb-8">
                         <div className="relative inline-block">
-                            <div className="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-glow animate-glow">
-                                <Sparkles size={32} className="animate-pulse-slow" />
+                            <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-glow animate-glow overflow-hidden">
+                                <img src="/hirulogo.png" alt="Hiru Logo" className="w-full h-full object-contain p-2" />
                             </div>
                             <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center animate-pulse">
                                 <Zap size={14} className="text-white" />
@@ -115,7 +115,7 @@ export default function Login() {
                     {/* Footer */}
                     <div className="mt-8 text-center animate-fadeIn" style={{ animationDelay: '0.4s' }}>
                         <p className="text-slate-900 font-bold text-lg">
-                            MediaFlow Brand Manager
+                            Hiru Media Flow Brand Manager
                         </p>
                         <p className="text-sm text-slate-600 font-bold mt-3">
                             Powered by Lotus AI R&D Team

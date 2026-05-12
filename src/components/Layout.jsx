@@ -40,10 +40,8 @@ export default function Layout({ children }) {
             <div className="w-64 card-glass border-r border-white/20 flex flex-col shadow-premium">
                 <div className="p-6 border-b border-white/20">
                     <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <span className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center text-white shadow-glow">
-                            M
-                        </span>
-                        <span className="text-gradient">MediaFlow</span>
+                        <img src="/hirulogo.png" alt="Hiru Logo" className="w-10 h-10 object-contain rounded-lg shadow-glow" />
+                        <span className="text-gradient">Hiru Media Flow</span>
                     </h1>
                     {userName && (
                         <p className="text-sm text-slate-600 mt-2 font-medium">Welcome, {userName}</p>

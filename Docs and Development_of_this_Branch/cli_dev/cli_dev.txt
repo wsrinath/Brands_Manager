@@ -1,0 +1,4 @@
+### cli_dev is deployed to the live site https://brands-manager.web.app/cli_dev
+
+brands and programme comparisson feature is added as latest features with video views fetching
+TTYTFB_VIEW folder is added 
