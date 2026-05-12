@@ -53,12 +53,14 @@ npx firebase deploy --only hosting:ttytfb_view
 ```
 
 ### Command	Purpose
-npm run dev 	: develop the app = Build feature
+1)npm run dev 	: develop the app = Build feature, check the feature is working correctly
 
-npm run build	: create production build = Package app for production
+2)npm run build	: create production build = Package app for production
 
-npm run preview	: test production build locally = Simulate live production locally
+3)npm run preview	: test production build locally = Simulate live production locally
 
-npx firebase deploy --only hosting : publish the site
+4)(No need every time)firebase hosting:channel:deploy preview-name (This gives you a temporary URL (like your npm run preview) but on Firebase's actual infrastructure. Share this with your QA team first.)
+
+5)npx firebase deploy --only hosting : publish the site
 (same result as:- firebase deploy --only hosting) = firebase deploy	Publish to internet
 
