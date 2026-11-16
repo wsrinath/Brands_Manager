@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .firebase/
 views_taking/README.md
+
+.env
+**/.env
+~$*
